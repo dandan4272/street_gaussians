@@ -179,7 +179,7 @@ class GaussianModel(nn.Module):
                 self.optimizer.load_state_dict(state_dict['optimizer'])
 
         
-    def state_dict(self, is_final=False):
+    def state_dict(self, is_final=False, *args, **kwargs):
         state_dict = {
             'xyz': self._xyz,
             'feature_dc': self._features_dc,

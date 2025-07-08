@@ -1,14 +1,14 @@
 task: waymo_full_exp
-source_path: ./data/waymo/training/002
-exp_name: waymo_train_002
+source_path: /home/yqnj/work/code/faw_3dgs/street-gaussian/dataset/training/004
+exp_name: waymo_train_004
 
 data:
   split_test: -1
   split_train: 1
   type: Waymo
   white_background: false
-  selected_frames: [98, 198]
-  cameras: [0, 1, 2]
+  selected_frames: [40, 45]
+  cameras: [0]
   extent: 10
   use_colmap: true
   filter_colmap: true
@@ -29,10 +29,12 @@ model:
 
 train:
   iterations: 50000
-  test_iterations: [7000, 30000, 50000]
-  save_iterations: [50000]
-  checkpoint_iterations: [50000]
+  test_iterations: [1000, 30000, 50000]
+  save_iterations: [2000,10000,50000]
+  checkpoint_iterations: [2000,10000,50000]
 
+
+# loaded_iter: 5000
 optim:
   prune_box_interval: 100
   densification_interval: 100
@@ -77,4 +79,4 @@ optim:
 
 render:
   fps: 24
-  concat_cameras: [1, 0, 2]
+  concat_cameras: [0]

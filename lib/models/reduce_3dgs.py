@@ -109,30 +109,32 @@ class Reduce3DGS:
             source_indices = torch.where(source_mask)[0]
             weights = gaussians.get_opacity[source_indices].squeeze()
             
-            if weights.sum() > 0:
-                weights = weights / weights.sum()
-                
-                # 加权平均位置
-                new_xyz[target_idx] = torch.sum(gaussians.get_xyz[source_indices] * weights.unsqueeze(1), dim=0)
-                
-                # 加权平均特征
-                new_features_dc[target_idx] = torch.sum(gaussians._features_dc[source_indices] * weights.unsqueeze(1).unsqueeze(2), dim=0)
-                new_features_rest[target_idx] = torch.sum(gaussians._features_rest[source_indices] * weights.unsqueeze(1).unsqueeze(2), dim=0)
-                
-                # 加权平均尺度（在对数空间）
-                source_scales = gaussians._scaling[source_indices]
-                new_scaling[target_idx] = torch.sum(source_scales * weights.unsqueeze(1), dim=0)
-                
-                # 旋转的平均（四元数）
-                source_rotations = gaussians._rotation[source_indices]
-                new_rotation[target_idx] = torch.sum(source_rotations * weights.unsqueeze(1), dim=0)
-                new_rotation[target_idx] = new_rotation[target_idx] / torch.norm(new_rotation[target_idx])
-                
-                # 加权平均不透明度
-                new_opacity[target_idx] = torch.sum(gaussians._opacity[source_indices] * weights.unsqueeze(1), dim=0)
-                
-                # 加权平均语义
-                new_semantic[target_idx] = torch.sum(gaussians._semantic[source_indices] * weights.unsqueeze(1), dim=0)
+            if weights.numel() == 0 or weights.sum() == 0:
+                continue
+            weights = weights / weights.sum()
+            weights = weights.view(-1, 1)  # 保证是二维
+            
+            # 加权平均位置
+            new_xyz[target_idx] = torch.sum(gaussians.get_xyz[source_indices] * weights, dim=0)
+            
+            # 加权平均特征
+            new_features_dc[target_idx] = torch.sum(gaussians._features_dc[source_indices] * weights.view(-1, 1, 1), dim=0)
+            new_features_rest[target_idx] = torch.sum(gaussians._features_rest[source_indices] * weights.view(-1, 1, 1), dim=0)
+            
+            # 加权平均尺度（在对数空间）
+            source_scales = gaussians._scaling[source_indices]
+            new_scaling[target_idx] = torch.sum(source_scales * weights.view(-1, 1), dim=0)
+            
+            # 旋转的平均（四元数）
+            source_rotations = gaussians._rotation[source_indices]
+            new_rotation[target_idx] = torch.sum(source_rotations * weights.view(-1, 1), dim=0)
+            new_rotation[target_idx] = new_rotation[target_idx] / torch.norm(new_rotation[target_idx])
+            
+            # 加权平均不透明度
+            new_opacity[target_idx] = torch.sum(gaussians._opacity[source_indices] * weights.view(-1, 1), dim=0)
+            
+            # 加权平均语义
+            new_semantic[target_idx] = torch.sum(gaussians._semantic[source_indices] * weights.view(-1, 1), dim=0)
         
         return {
             'xyz': new_xyz,
@@ -215,7 +217,7 @@ class ReducedGaussianModel(nn.Module):
         """使用reduce_3dgs方法替换原始的densify_and_prune"""
         if not self.is_reduced:
             # 首先进行传统的densify和prune以处理梯度信息
-            self.base_model.densify_and_prune(max_grad, min_opacity, extent, max_screen_size)
+            self.base_model.densify_and_prune(max_grad, min_opacity, max_screen_size)
             
             # 然后应用reduce_3dgs方法
             reduced_params = self.reducer.reduce_gaussians(self.base_model)

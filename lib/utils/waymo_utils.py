@@ -16,24 +16,64 @@ from lib.utils.general_utils import matrix_to_quaternion, quaternion_to_matrix_n
 from lib.datasets.base_readers import storePly, get_Sphere_Norm
 
 waymo_track2label = {"vehicle": 0, "pedestrian": 1, "cyclist": 2, "sign": 3, "misc": -1}
+# waymo_track2label = {"car": 0, "suv": 1, "cyclist": 2, "pedestrians": 3, "bus": 4,"truck":5}
+
+
+# waymo_track2label = {"car": 0, "truck": 1, "motorcycle": 2, "pedestrian": 3, "traffic_cone": 4,"other":5}
+
+CLASS_MAPPING ={
+        'car': 'vehicle',
+        'suv': 'vehicle',
+        'minivan': 'vehicle',
+        'tiny_car': 'vehicle',
+        'bus': 'vehicle',
+        'truck': 'vehicle',
+        'lorry': 'vehicle',
+        'engineer_vehicles': 'vehicle',
+        'other_vehicles': 'vehicle',
+
+        'bicycle': 'cyclist',
+        'e_bike': 'cyclist',
+        'motorcycle': 'cyclist',
+        'tricycle': 'cyclist',
+        'moto_tricycle': 'cyclist',
+        'cyclist': 'cyclist',
+        'tricyclist': 'cyclist',
+
+        'pedestrians': 'pedestrian',
+
+        'traffic_cone' : 'sign',
+        'warning_triangle' : 'sign',
+
+        'waterhorse' : 'misc',
+        'bicycle_pack' : 'misc',
+        'road_stake': 'sign',
+        'crash_barrel': 'sign',
+        'construction_board': 'misc',
+        'other_temporary_traffic_obstruction': 'misc',
+        'berm': 'misc'
+    }
+
 
 _camera2label = {
-    'FRONT': 0,
-    'FRONT_LEFT': 1,
-    'FRONT_RIGHT': 2,
-    'SIDE_LEFT': 3,
-    'SIDE_RIGHT': 4,
+    'frontwide': 0,
+    'leftfront': 1,
+    'rightfront': 2,
+    'leftrear': 3,
+    'rightrear': 4,
 }
 
 _label2camera = {
-    0: 'FRONT',
-    1: 'FRONT_LEFT',
-    2: 'FRONT_RIGHT',
-    3: 'SIDE_LEFT',
-    4: 'SIDE_RIGHT',
+    0: 'frontwide',
+    1: 'leftfront',
+    2: 'rightfront',
+    3: 'leftrear',
+    4: 'rightrear',
 }
-image_heights = [1280, 1280, 1280, 886, 886]
-image_widths = [1920, 1920, 1920, 1920, 1920]
+
+image_heights = [1645, 1200, 1200, 886, 886]
+image_widths = [3840, 1920, 1920, 1920, 1920]
+
 image_filename_to_cam = lambda x: int(x.split('.')[0][-1])
 image_filename_to_frame = lambda x: int(x.split('.')[0][:6])
 
@@ -109,7 +149,7 @@ def make_obj_pose(ego_pose, box_info):
 
 
 
-def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2, 3, 4]):
+def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2]):
     tracklets_ls = []    
     objects_info = {}
 
@@ -131,7 +171,7 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
     start_frame, end_frame = selected_frames[0], selected_frames[1]
 
     image_dir = os.path.join(datadir, 'images')
-    n_cameras = 5
+    n_cameras = 3
     n_images = len(os.listdir(image_dir))
     n_frames = n_images // n_cameras
     n_obj_in_frame = np.zeros(n_frames)
@@ -142,9 +182,11 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
         track_id = int(tracklet[1])
         object_class = tracklet[2]
         
-        if object_class in ['sign', 'misc']:
+        if object_class not in CLASS_MAPPING:
             continue
-        
+
+        if CLASS_MAPPING[object_class] in ['sign', 'misc']:
+            continue
         cameras_vis_list = tracklet_camera_vis[str(track_id)][str(frame_id)]
         join_cameras_list = list(set(cameras) & set(cameras_vis_list))
         if len(join_cameras_list) == 0:
@@ -154,7 +196,7 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
             objects_info[track_id] = dict()
             objects_info[track_id]['track_id'] = track_id
             objects_info[track_id]['class'] = object_class
-            objects_info[track_id]['class_label'] = waymo_track2label[object_class]
+            objects_info[track_id]['class_label'] = waymo_track2label[CLASS_MAPPING[object_class]]
             objects_info[track_id]['height'] = float(tracklet[4])
             objects_info[track_id]['width'] = float(tracklet[5])
             objects_info[track_id]['length'] = float(tracklet[6])
@@ -256,18 +298,18 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
         obj_frames = frames[obj_frame_idx]
         obj['start_frame'] = np.min(obj_frames)
         obj['end_frame'] = np.max(obj_frames)
-        
+
         objects_info[key] = obj
 
     # [num_frames, max_obj, track_id, x, y, z, qw, qx, qy, qz]
     objects_tracklets_world = np.concatenate(
         [visible_objects_ids[..., None], visible_objects_pose_world], axis=-1
     )
-    
+
     objects_tracklets_vehicle = np.concatenate(
         [visible_objects_ids[..., None], visible_objects_pose_vehicle], axis=-1
     )
-    
+
     
     return objects_tracklets_world, objects_tracklets_vehicle, objects_info
 
@@ -292,12 +334,12 @@ def generate_dataparser_outputs(
         datadir, 
         selected_frames=None, 
         build_pointcloud=True, 
-        cameras=[0, 1, 2, 3, 4]
+        cameras=[0, 1, 2]
     ):
     
     image_dir = os.path.join(datadir, 'images')
     image_filenames_all = sorted(glob(os.path.join(image_dir, '*.png')))
-    num_frames_all = len(image_filenames_all) // 5
+    num_frames_all = len(image_filenames_all) // 3
     num_cameras = len(cameras)
     
     if selected_frames is None:
@@ -347,7 +389,9 @@ def generate_dataparser_outputs(
         if frame >= start_frame and frame <= end_frame and cam in cameras:
             ixt = intrinsics[cam]
             ext = extrinsics[cam]
-            pose = ego_cam_poses[cam, frame]
+            # pose = ego_cam_poses[cam, frame]
+            pose = ego_frame_poses[frame]
+
             c2w = pose @ ext
 
             frames.append(frame)
