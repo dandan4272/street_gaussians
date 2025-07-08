@@ -1,0 +1,76 @@
+task: chunked_street_gaussians_fixed
+source_path: ""  # 将在命令行中指定
+exp_name: chunked_experiment_fixed
+to_cuda: false  # 在代码中手动管理GPU
+
+data:
+  split_test: -1
+  split_train: 1
+  type: Waymo  # 根据你的数据集类型调整
+  white_background: false
+  extent: 10  # 场景范围(米) - 减小以节省内存
+  use_colmap: true
+  filter_colmap: false  # 禁用以避免额外处理
+  box_scale: 1.0
+  shuffle: false  # 禁用混洗以保持块的连续性
+
+model:
+  gaussian:
+    sh_degree: 0          # 最低SH度数以节省内存
+    fourier_dim: 1        # 最小傅里叶维度
+    fourier_scale: 1.0
+    flip_prob: 0.0        # 禁用翻转以简化
+  nsg:
+    include_bkgd: true
+    include_obj: false    # 暂时禁用物体以简化
+    include_sky: false    # 禁用天空以节省内存
+    opt_track: false      # 禁用轨迹优化以简化
+
+# 简化的训练参数
+train:
+  iterations: 5000        # 减少迭代数用于快速测试
+  test_iterations: [2500, 5000]
+  save_iterations: [5000]
+  checkpoint_iterations: [5000]
+  quiet: false
+  detect_anomaly: false
+
+# 内存友好的优化器参数
+optim:
+  # 学习率设置
+  position_lr_init: 0.00016
+  position_lr_final: 0.0000016
+  position_lr_delay_mult: 0.01
+  position_lr_max_steps: 5000
+  feature_lr: 0.0025
+  opacity_lr: 0.05
+  scaling_lr: 0.005
+  rotation_lr: 0.001
+  
+  # 密集化参数 - 保守设置
+  percent_dense: 0.01
+  densification_interval: 100
+  opacity_reset_interval: 1500
+  densify_from_iter: 500
+  densify_until_iter: 4000  # 提前停止密集化
+  densify_grad_threshold: 0.0002
+  max_screen_size: 20
+  min_opacity: 0.005
+  
+  # 损失权重
+  lambda_l1: 1.0
+  lambda_dssim: 0.2
+  lambda_sky: 0.0
+  lambda_semantic: 0.0
+  lambda_reg: 0.0
+  lambda_depth_lidar: 0.0
+  lambda_depth_mono: 0.0
+  lambda_normal_mono: 0.0
+  lambda_color_correction: 0.0
+
+render:
+  convert_SHs_python: false
+  compute_cov3D_python: false
+  debug: false
+  scaling_modifier: 1.0
+  fps: 24
