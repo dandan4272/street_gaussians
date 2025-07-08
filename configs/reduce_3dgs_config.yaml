@@ -1,0 +1,109 @@
+# Reduce 3DGS Configuration
+# 基于原始street_gaussians配置，添加reduce_3dgs相关设置
+
+task: street_gaussians_reduce
+exp_name: reduce_3dgs_demo
+
+# 数据配置
+data:
+  white_background: false
+  eval: false
+  images: images
+  resolution: -1
+  data_device: cuda
+  dataset_type: waymo
+
+# 模型配置
+model:
+  name: street_gaussian
+  gaussian:
+    sh_degree: 3
+    # reduce_3dgs 相关设置
+    use_reduce_3dgs: true
+    reduction_ratio: 0.1  # 保留10%的高斯
+    densify_grad_threshold: 0.0002
+    densify_until_iter: 15000
+    densify_from_iter: 500
+    densification_interval: 100
+    opacity_reset_interval: 3000
+    min_opacity: 0.005
+    fourier_dim: 1
+    flip_prob: 0.0
+    semantic_mode: logits
+    sh_degree_background: 3
+    sh_degree_sky: 1
+    sh_degree_obj: 3
+    
+  nsg:
+    include_bkgd: true
+    include_obj: true
+    include_sky: false
+    
+  use_color_correction: false
+  use_pose_correction: false
+
+# 优化参数
+optim:
+  position_lr_init: 0.00016
+  position_lr_final: 0.0000016
+  position_lr_delay_mult: 0.01
+  position_lr_max_steps: 30000
+  feature_lr: 0.0025
+  opacity_lr: 0.05
+  scaling_lr: 0.005
+  rotation_lr: 0.001
+  semantic_lr: 0.001
+  percent_dense: 0.01
+  percent_big_ws: 0.05
+  
+  lambda_dssim: 0.2
+  lambda_l1: 0.8
+  lambda_sky: 0.01
+  lambda_sky_scale: []
+  lambda_reg: 0.01
+  lambda_depth_lidar: 1.0
+  lambda_color_correction: 0.1
+  
+  # reduce_3dgs 特定参数
+  lambda_reduce_reg: 0.001  # reduce_3dgs正则化权重
+  densify_grad_threshold: 0.0002
+  densify_until_iter: 15000
+  densify_from_iter: 500
+  densification_interval: 100
+  opacity_reset_interval: 3000
+  min_opacity: 0.005
+
+# 训练配置
+train:
+  iterations: 30000
+  position_lr_init: 0.00016
+  position_lr_final: 0.0000016
+  position_lr_delay_mult: 0.01
+  position_lr_max_steps: 30000
+  feature_lr: 0.0025
+  opacity_lr: 0.05
+  scaling_lr: 0.005
+  rotation_lr: 0.001
+  percent_dense: 0.01
+  lambda_dssim: 0.2
+  densification_interval: 100
+  opacity_reset_interval: 3000
+  densify_from_iter: 500
+  densify_until_iter: 15000
+  densify_grad_threshold: 0.0002
+  min_opacity: 0.005
+  
+  save_iterations: [7000, 15000, 30000]
+  test_iterations: [7000, 15000, 30000]
+  checkpoint_iterations: [7000, 15000, 30000]
+  
+  quiet: false
+  detect_anomaly: false
+
+# 评估配置
+eval:
+  frame_id: 0
+
+# 数据加载配置
+dataset:
+  cap_max: 1000000

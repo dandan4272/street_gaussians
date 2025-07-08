@@ -1,0 +1,15 @@
+# Reduce_3DGS 额外依赖项
+# 在原有 requirements.txt 基础上新增的依赖
+
+# 机器学习和数值计算
+scikit-learn>=1.0.0      # 用于KMeans聚类和KD树
+scipy>=1.7.0             # 用于最优传输的线性分配算法
+
+# 原有依赖项 (确保版本兼容)
+# torch>=1.13.1           # 已在原requirements.txt中
+# numpy>=1.23.5           # 已在原requirements.txt中
+
+# 可选的性能优化依赖
+# numba>=0.56.0           # 可选: JIT编译加速数值计算
+# cupy-cuda11x>=10.0.0    # 可选: GPU加速数组计算 (需要CUDA 11.x)
+# cupy-cuda12x>=12.0.0    # 可选: GPU加速数组计算 (需要CUDA 12.x)

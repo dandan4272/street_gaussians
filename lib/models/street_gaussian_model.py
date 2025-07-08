@@ -25,6 +25,7 @@ from lib.models.actor_pose import ActorPose
 from lib.models.sky_cubemap import SkyCubeMap
 from lib.models.color_correction import ColorCorrection
 from lib.models.camera_pose import PoseCorrection
+from lib.models.reduce_3dgs import Reduce3DGS, ReducedGaussianModel
 
 class StreetGaussianModel(nn.Module):
     def __init__(self, metadata):
@@ -52,6 +53,10 @@ class StreetGaussianModel(nn.Module):
         
         # camera pose optimizations (not test)
         self.use_pose_correction = cfg.model.use_pose_correction
+        
+        # reduce_3dgs support
+        self.use_reduce_3dgs = cfg.model.gaussian.get('use_reduce_3dgs', False)
+        self.reduction_ratio = cfg.model.gaussian.get('reduction_ratio', 0.1)
     
         # symmetry
         self.flip_prob = cfg.model.gaussian.get('flip_prob', 0.)
@@ -171,13 +176,19 @@ class StreetGaussianModel(nn.Module):
         
         # Build background model
         if self.include_background:
-            self.background = GaussianModelBkgd(
+            background_model = GaussianModelBkgd(
                 model_name='background', 
                 scene_center=self.metadata['scene_center'],
                 scene_radius=self.metadata['scene_radius'],
                 sphere_center=self.metadata['sphere_center'],
                 sphere_radius=self.metadata['sphere_radius'],
             )
+            
+            # Apply reduce_3dgs wrapper if enabled
+            if self.use_reduce_3dgs:
+                self.background = ReducedGaussianModel(background_model, self.reduction_ratio)
+            else:
+                self.background = background_model
                                     
             self.model_name_id['background'] = 0
             self.models_num += 1
@@ -186,7 +197,14 @@ class StreetGaussianModel(nn.Module):
         if self.include_obj:
             for track_id, obj_meta in self.obj_info.items():
                 model_name = f'obj_{track_id:03d}'
-                setattr(self, model_name, GaussianModelActor(model_name=model_name, obj_meta=obj_meta))
+                actor_model = GaussianModelActor(model_name=model_name, obj_meta=obj_meta)
+                
+                # Apply reduce_3dgs wrapper if enabled
+                if self.use_reduce_3dgs:
+                    setattr(self, model_name, ReducedGaussianModel(actor_model, self.reduction_ratio))
+                else:
+                    setattr(self, model_name, actor_model)
+                    
                 self.model_name_id[model_name] = self.models_num
                 self.obj_list.append(model_name)
                 self.models_num += 1
@@ -576,9 +594,17 @@ class StreetGaussianModel(nn.Module):
         for model_name in self.model_name_id.keys():
             if startswith_any(model_name, exclude_list):
                 continue
-            model: GaussianModel = getattr(self, model_name)
+            model = getattr(self, model_name)
 
-            scalars_, tensors_ = model.densify_and_prune(max_grad, min_opacity, prune_big_points)
+            # Check if using reduce_3dgs method
+            if self.use_reduce_3dgs and hasattr(model, 'reduce_and_prune'):
+                # Use reduce_3dgs method - need to calculate scene extent
+                scene_extent = self.metadata.get('scene_radius', 100.0)  # fallback value
+                scalars_, tensors_ = model.reduce_and_prune(max_grad, min_opacity, scene_extent, prune_big_points)
+            else:
+                # Use traditional densify_and_prune
+                scalars_, tensors_ = model.densify_and_prune(max_grad, min_opacity, prune_big_points)
+                
             if model_name == 'background':
                 scalars = scalars_
                 tensors = tensors_
