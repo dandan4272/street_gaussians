@@ -1,0 +1,100 @@
+task: chunked_street_gaussians
+source_path: ???  # 数据集路径
+exp_name: chunked_experiment
+to_cuda: false  # 不预加载到GPU以节省内存
+
+# 分块训练专用配置
+chunked_training:
+  enabled: true
+  chunk_size: 5           # 每个块的帧数
+  overlap_size: 1         # 重叠帧数
+  contribution_threshold: 0.1  # 高斯基元贡献度阈值
+  max_memory_gb: 12.0     # 最大GPU内存使用(GB)
+  prune_ratio: 0.8        # 保留高贡献度高斯基元的比例
+
+data:
+  split_test: -1
+  split_train: 1
+  type: Waymo  # 或者 Colmap
+  white_background: false
+  selected_frames: ???
+  cameras: [0, 1, 2]  # 使用的相机索引
+  extent: 15  # 场景范围(米)
+  use_colmap: true
+  filter_colmap: true
+  box_scale: 1.2
+
+model:
+  gaussian:
+    sh_degree: 1          # 降低SH度数以节省内存
+    fourier_dim: 3        # 降低傅里叶维度
+    fourier_scale: 1.
+    flip_prob: 0.1        # 降低翻转概率
+  nsg:
+    include_bkgd: true
+    include_obj: true
+    include_sky: false    # 禁用天空以节省内存
+    opt_track: true
+  sky:
+    resolution: 512       # 降低天空分辨率
+    white_background: false
+
+# 优化的训练参数
+train:
+  iterations: 15000       # 减少总训练迭代数
+  test_iterations: [5000, 15000]
+  save_iterations: [15000]
+  checkpoint_iterations: [15000]
+
+# 优化的优化器参数
+optim:
+  # 密集化参数 - 更保守的设置
+  prune_box_interval: 200
+  densification_interval: 200  # 增加间隔以减少内存峰值
+  densify_from_iter: 1000
+  densify_grad_threshold_bkgd: 0.0008
+  densify_grad_abs_bkgd: True
+  densify_grad_threshold_obj: 0.0004
+  densify_grad_abs_obj: False
+  densify_grad_threshold: 0.0004
+  densify_until_iter: 12000  # 提前停止密集化
+  
+  # 学习率 - 适度降低
+  feature_lr: 0.002
+  max_screen_size: 15     # 降低最大屏幕尺寸
+  min_opacity: 0.01       # 提高最小不透明度阈值
+  opacity_lr: 0.04
+  opacity_reset_interval: 2000  # 更频繁重置不透明度
+  percent_big_ws: 0.05    # 降低大高斯基元比例
+  percent_dense: 0.005    # 降低密集化比例
+  position_lr_delay_mult: 0.01
+  position_lr_final: 1.2e-06
+  position_lr_init: 0.00012
+  position_lr_max_steps: 15000
+  rotation_lr: 0.0008
+  scaling_lr: 0.004
+  semantic_lr: 0.008
+
+  # 损失权重
+  lambda_dssim: 0.2
+  lambda_sky: 0.03
+  lambda_sky_scale: []
+  lambda_mask: 0.08
+  lambda_reg: 0.08
+  lambda_depth_lidar: 0.08
+
+  # 轨迹优化参数
+  track_position_lr_delay_mult: 0.2
+  track_position_lr_init: 0.0003
+  track_position_lr_final: 0.00008
+  track_position_max_steps: 15000
+
+  track_rotation_lr_delay_mult: 0.5
+  track_rotation_lr_init: 0.000008
+  track_rotation_lr_final: 0.000004
+  track_rotation_max_steps: 15000
+
+render:
+  fps: 24
+  concat_cameras: [1, 0, 2]
+  scaling_modifier: 0.8   # 降低渲染时的缩放
